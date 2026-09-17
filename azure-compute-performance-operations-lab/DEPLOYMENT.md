@@ -183,6 +183,41 @@ if ($orchestrationMode -eq "Flexible") {
 
 > `install-order-api.sh`는 워크숍 환경에서 사용할 샘플 서비스 설치 스크립트입니다. 실제 서비스 배포 방식(Docker, systemd, 패키지 배포)이 있다면 이 단계에서 교체하고 health endpoint 계약만 유지합니다.
 
+## 5. Load Balancer probe와 HTTP rule 구성
+
+`az vmss create` 버전이나 옵션 조합에 따라 backend pool만 만들어지고 HTTP probe/rule이 자동으로 만들어지지 않을 수 있습니다. 공인 IP가 있어도 rule이 없으면 외부에서 연결되지 않으므로 명시적으로 확인하고 없으면 생성합니다.
+
+```powershell
+$lbName = az network lb list -g $rg --query "[0].name" -o tsv
+$frontendName = az network lb frontend-ip list -g $rg --lb-name $lbName `
+  --query "[0].name" -o tsv
+$backendName = az network lb address-pool list -g $rg --lb-name $lbName `
+  --query "[0].name" -o tsv
+
+$probeName = az network lb probe list -g $rg --lb-name $lbName `
+  --query "[?port == \`80\`].name | [0]" -o tsv
+if (-not $probeName) {
+  $probeName = "order-api-health"
+  az network lb probe create -g $rg --lb-name $lbName -n $probeName `
+    --protocol Http --port 80 --path /healthz
+}
+
+$ruleName = az network lb rule list -g $rg --lb-name $lbName `
+  --query "[?frontendPort == \`80\` && backendPort == \`80\`].name | [0]" -o tsv
+if (-not $ruleName) {
+  az network lb rule create -g $rg --lb-name $lbName -n order-api-http `
+    --frontend-ip-name $frontendName `
+    --backend-pool-name $backendName `
+    --probe-name $probeName `
+    --protocol Tcp --frontend-port 80 --backend-port 80
+}
+
+az network lb probe list -g $rg --lb-name $lbName `
+  --query "[].{name:name,protocol:protocol,port:port,path:requestPath}" -o table
+az network lb rule list -g $rg --lb-name $lbName `
+  --query "[].{name:name,frontendPort:frontendPort,backendPort:backendPort}" -o table
+```
+
 Load Balancer frontend IP를 확인합니다.
 
 ```powershell
@@ -192,7 +227,34 @@ curl.exe "http://$pip/healthz"
 curl.exe "http://$pip/readyz"
 ```
 
-## 5. Azure Monitor 연결
+## 6. 연결 문제 진단
+
+외부 curl이 실패하면 먼저 VM 내부에서 서비스가 실제로 실행 중인지 확인합니다.
+
+```powershell
+foreach ($vmId in $vmIds) {
+  az vm run-command invoke --ids $vmId `
+    --command-id RunShellScript `
+    --scripts "systemctl is-active order-api; ss -lntp | grep ':80'; curl -fsS http://127.0.0.1/healthz"
+}
+```
+
+정상 결과는 각 VM에서 `active`, `LISTEN ... :80`, `ok`입니다. 여기서 실패하면 설치 스크립트를 다시 실행하고, 외부 curl을 반복하지 않습니다.
+
+VM 내부가 정상인데 외부 연결이 실패하면 다음을 확인합니다.
+
+```powershell
+az network lb show -g $rg -n $lbName `
+  --query "{name:name,sku:sku.name,frontend:frontendIPConfigurations[].name,backend:backendAddressPools[].name}" -o json
+az network lb rule list -g $rg --lb-name $lbName -o table
+az network lb probe list -g $rg --lb-name $lbName -o table
+az network nsg rule list -g $rg --nsg-name $nsg `
+  --query "[].{name:name,priority:priority,access:access,direction:direction,port:destinationPortRange}" -o table
+```
+
+HTTP rule, HTTP probe, backend pool, 그리고 TCP 80 허용 NSG 규칙이 모두 있어야 합니다.
+
+## 7. Azure Monitor 연결
 
 VMSS에 system-assigned managed identity를 켭니다.
 

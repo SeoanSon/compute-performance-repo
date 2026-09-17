@@ -131,14 +131,24 @@ az vmss create `
 VMSS 인스턴스에 설치 스크립트를 실행합니다. 샘플 서비스는 외부 의존성 없이 health endpoint와 부하 테스트용 endpoint를 제공합니다.
 
 ```powershell
-$instanceIds = az vmss list-instances -g $rg -n $vmss `
-  --query "[].instanceId" -o tsv
+$instanceIds = @(
+  az vmss list-instances -g $rg -n $vmss `
+    --query "[].instanceId" -o json |
+    ConvertFrom-Json
+)
+if ($instanceIds.Count -eq 0) {
+  throw "No VMSS instances found. Check `$rg and `$vmss."
+}
+$installScript = Get-Content -Raw ".\scripts\install-order-api.sh"
 foreach ($instanceId in $instanceIds) {
+  if ($instanceId -notmatch '^\d+$') {
+    throw "Unexpected VMSS instance ID: [$instanceId]"
+  }
   az vmss run-command invoke `
     -g $rg -n $vmss `
     --instance-id $instanceId `
     --command-id RunShellScript `
-    --scripts @".\scripts\install-order-api.sh"
+    --scripts $installScript
 }
 ```
 

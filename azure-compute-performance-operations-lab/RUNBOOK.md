@@ -116,6 +116,9 @@ if ($vmssMode -eq "Flexible") {
       --query "[?starts_with(name, '$vmss')].id" -o json |
       ConvertFrom-Json
   )
+  if ($vmIds.Count -eq 1 -and $vmIds[0] -is [string] -and $vmIds[0] -match " ") {
+    $vmIds = $vmIds[0] -split "\s+"
+  }
   $vmIds | ForEach-Object { az resource show --ids $_ --query "{name:name,state:properties.provisioningState}" -o table }
 } else {
   az vmss list-instances -g $rg -n $vmss `
@@ -141,6 +144,69 @@ if ($vmssMode -eq "Flexible") {
     az vm run-command invoke --ids $vmId `
       --command-id RunShellScript `
       --scripts "systemctl is-active order-api; ss -lntp | grep ':80'; curl -fsS http://127.0.0.1/healthz"
+  }
+}
+```
+
+`order-api.service could not be found`가 나오거나 80번 포트 소유자가
+`nginx`이면 설치 결과가 VM에 적용되지 않은 것입니다. 아래 블록은 로컬
+파일 전달 여부와 무관하게 각 VM에 서비스를 직접 설치하고, 성공하지 않으면
+즉시 중단합니다.
+
+```powershell
+$repairScript = @'
+set -eux
+systemctl disable --now nginx 2>/dev/null || true
+pkill -x nginx 2>/dev/null || true
+apt-get update -y
+apt-get install -y python3
+cat >/opt/order-api.py <<'PY'
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import hashlib
+class Handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        if self.path in ("/healthz", "/readyz"):
+            body = b"ok\n"; self.send_response(200)
+        elif self.path.startswith("/api/orders"):
+            digest = hashlib.sha256((self.path * 200).encode()).hexdigest()
+            body = ('{"status":"ok","digest":"' + digest + '"}\n').encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+        else:
+            body = b"not found\n"; self.send_response(404)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+    def log_message(self, format, *args):
+        pass
+ThreadingHTTPServer(("0.0.0.0", 80), Handler).serve_forever()
+PY
+cat >/etc/systemd/system/order-api.service <<'UNIT'
+[Unit]
+Description=Workshop Order API
+After=network-online.target
+[Service]
+ExecStart=/usr/bin/python3 /opt/order-api.py
+Restart=always
+RestartSec=2
+[Install]
+WantedBy=multi-user.target
+UNIT
+systemctl daemon-reload
+systemctl enable order-api
+systemctl restart order-api
+sleep 2
+systemctl is-active --quiet order-api
+curl -fsS http://127.0.0.1/healthz
+'@
+
+foreach ($vmId in $vmIds) {
+  Write-Host "Installing directly on $vmId"
+  az vm run-command invoke --ids $vmId `
+    --command-id RunShellScript `
+    --scripts $repairScript
+  if ($LASTEXITCODE -ne 0) {
+    throw "Installation failed on $vmId"
   }
 }
 ```

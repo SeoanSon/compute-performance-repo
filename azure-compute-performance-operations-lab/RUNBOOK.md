@@ -112,13 +112,12 @@ az network lb frontend-ip update -g $rg `
 ```powershell
 if ($vmssMode -eq "Flexible") {
   $vmIds = @(
-    az vm list -g $rg `
-      --query "[?starts_with(name, '$vmss')].id" -o json |
-      ConvertFrom-Json
+    (az vm list -g $rg `
+      --query "[?starts_with(name, '$vmss')].id" -o tsv) `
+      -split "\r?\n" |
+      ForEach-Object { $_.Trim() } |
+      Where-Object { $_ }
   )
-  if ($vmIds.Count -eq 1 -and $vmIds[0] -is [string] -and $vmIds[0] -match " ") {
-    $vmIds = $vmIds[0] -split "\s+"
-  }
   $vmIds | ForEach-Object { az resource show --ids $_ --query "{name:name,state:properties.provisioningState}" -o table }
 } else {
   az vmss list-instances -g $rg -n $vmss `

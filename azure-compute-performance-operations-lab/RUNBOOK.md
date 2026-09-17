@@ -85,6 +85,11 @@ if (-not $pip) {
 }
 ```
 
+`az ... -o json` 결과를 PowerShell 속성으로 읽을 때는 반드시
+`ConvertFrom-Json`을 사용합니다. JSON을 변환하지 않은 문자열에는
+`.ipAddress` 같은 속성이 없습니다. 이 런북은 IP 주소만 필요한 경우
+`--query ipAddress -o tsv`를 사용해 문자열을 직접 받습니다.
+
 If the previous block says that no public IP is attached, run this remediation block and then repeat step 2.
 
 ```powershell

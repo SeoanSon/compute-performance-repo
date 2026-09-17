@@ -145,6 +145,10 @@ LISTEN ... :80
 ok
 ```
 
+`inactive`이고 80번 포트의 프로세스가 `nginx`이면 이미지에 포함된 nginx가
+샘플 API의 포트를 점유한 상태입니다. 아래 재설치 블록은 nginx를 중지하고
+`order-api`를 다시 시작합니다.
+
 `active` 또는 `ok`가 없으면 다음 설치 블록을 한 번 실행한 뒤 3-1을 다시 실행합니다.
 
 ```powershell

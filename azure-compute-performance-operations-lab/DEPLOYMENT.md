@@ -183,6 +183,9 @@ if ($orchestrationMode -eq "Flexible") {
 
 > `install-order-api.sh`는 워크숍 환경에서 사용할 샘플 서비스 설치 스크립트입니다. 실제 서비스 배포 방식(Docker, systemd, 패키지 배포)이 있다면 이 단계에서 교체하고 health endpoint 계약만 유지합니다.
 
+설치 스크립트는 Ubuntu 이미지에 nginx가 이미 설치되어 80번 포트를 사용하고
+있는 경우 nginx를 중지한 뒤 샘플 API를 80번 포트에서 시작합니다.
+
 ## 5. Load Balancer probe와 HTTP rule 구성
 
 `az vmss create` 버전이나 옵션 조합에 따라 backend pool만 만들어지고 HTTP probe/rule이 자동으로 만들어지지 않을 수 있습니다. 공인 IP가 있어도 rule이 없으면 외부에서 연결되지 않으므로 명시적으로 확인하고 없으면 생성합니다.

@@ -61,4 +61,7 @@ WantedBy=multi-user.target
 UNIT
 
 systemctl daemon-reload
+if systemctl list-unit-files nginx.service >/dev/null 2>&1; then
+  systemctl disable --now nginx || true
+fi
 systemctl enable --now order-api

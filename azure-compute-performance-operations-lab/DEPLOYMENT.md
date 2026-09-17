@@ -220,8 +220,18 @@ az network lb rule list -g $rg --lb-name $lbName `
 Load Balancer frontend IP를 확인합니다.
 
 ```powershell
-$pip = az network public-ip list -g $rg `
-  --query "[?ipAddress != null].ipAddress | [0]" -o tsv
+$frontendConfigs = @(
+  az network lb frontend-ip list -g $rg --lb-name $lbName -o json |
+    ConvertFrom-Json
+)
+$publicIpId = $frontendConfigs |
+  Where-Object { $_.publicIPAddress -and $_.publicIPAddress.id } |
+  Select-Object -First 1 -ExpandProperty publicIPAddress |
+  Select-Object -ExpandProperty id
+if (-not $publicIpId) {
+  throw "No public IP is attached to the Load Balancer frontend."
+}
+$pip = az network public-ip show --ids $publicIpId --query ipAddress -o tsv
 curl.exe "http://$pip/healthz"
 curl.exe "http://$pip/readyz"
 ```

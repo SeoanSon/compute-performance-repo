@@ -55,17 +55,51 @@ az vmss show -g $rg -n $vmss `
 
 ```powershell
 $lbName = az network lb list -g $rg --query "[0].name" -o tsv
-$pip = az network lb show -g $rg -n $lbName `
-  --query "frontendIpConfigurations[0].publicIPAddress.id" -o tsv |
-  ForEach-Object { az network public-ip show --ids $_ --query ipAddress -o tsv }
+$frontendConfigs = @(
+  az network lb frontend-ip list -g $rg --lb-name $lbName -o json |
+    ConvertFrom-Json
+)
+$publicIpId = $null
+foreach ($frontendConfig in $frontendConfigs) {
+  if ($null -ne $frontendConfig.publicIPAddress -and $frontendConfig.publicIPAddress.id) {
+    $publicIpId = $frontendConfig.publicIPAddress.id
+    break
+  }
+}
+$pip = $null
+if ($publicIpId) {
+  $pip = az network public-ip show --ids $publicIpId --query ipAddress -o tsv
+}
 
 $vmssMode = az vmss show -g $rg -n $vmss --query orchestrationMode -o tsv
 $vmssMode
 $lbName
+$publicIpId
 $pip
 
-if (-not $pip) { throw "Load Balancer public IP was not found." }
 if (-not $lbName) { throw "Load Balancer was not found." }
+if (-not $pip) {
+  Write-Host "No public IP is attached. Frontend configuration:"
+  $frontendConfigs | Select-Object name, privateIPAddress, publicIPAddress | Format-List
+  throw "No public IP is attached to the Load Balancer frontend. Run the remediation block below."
+}
+```
+
+If the previous block says that no public IP is attached, run this remediation block and then repeat step 2.
+
+```powershell
+$frontendName = $frontendConfigs[0].name
+$pipName = "pip-$vmss"
+
+az network public-ip create -g $rg -n $pipName `
+  --sku Standard `
+  --allocation-method Static `
+  --dns-name $vmss.ToLower()
+
+az network lb frontend-ip update -g $rg `
+  --lb-name $lbName `
+  -n $frontendName `
+  --public-ip-address $pipName
 ```
 
 인스턴스 상태를 확인합니다.

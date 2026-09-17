@@ -131,24 +131,51 @@ az vmss create `
 VMSS 인스턴스에 설치 스크립트를 실행합니다. 샘플 서비스는 외부 의존성 없이 health endpoint와 부하 테스트용 endpoint를 제공합니다.
 
 ```powershell
-$instanceIds = @(
-  az vmss list-instances -g $rg -n $vmss `
-    --query "[].instanceId" -o json |
-    ConvertFrom-Json
-)
-if ($instanceIds.Count -eq 0) {
-  throw "No VMSS instances found. Check `$rg and `$vmss."
+$repoRoot = "C:\Users\seoanson\compute-performance-repo"
+$scriptPath = Join-Path $repoRoot `
+  "azure-compute-performance-operations-lab\scripts\install-order-api.sh"
+if (-not (Test-Path -LiteralPath $scriptPath)) {
+  throw "Install script not found: $scriptPath"
 }
-$installScript = Get-Content -Raw ".\scripts\install-order-api.sh"
-foreach ($instanceId in $instanceIds) {
-  if ($instanceId -notmatch '^\d+$') {
-    throw "Unexpected VMSS instance ID: [$instanceId]"
+$installScript = Get-Content -Raw -LiteralPath $scriptPath
+
+$orchestrationMode = az vmss show -g $rg -n $vmss `
+  --query orchestrationMode -o tsv
+if ($orchestrationMode -eq "Flexible") {
+  # Flexible VMSS instances have resource-name IDs, not numeric instance IDs.
+  $vmNames = @(
+    az vm list -g $rg `
+      --query "[?starts_with(name, '$vmss')].name" -o json |
+      ConvertFrom-Json
+  )
+  if ($vmNames.Count -eq 0) {
+    throw "No Flexible VMSS VMs found. Check `$rg and `$vmss."
   }
-  az vmss run-command invoke `
-    -g $rg -n $vmss `
-    --instance-id $instanceId `
-    --command-id RunShellScript `
-    --scripts $installScript
+  foreach ($vmName in $vmNames) {
+    az vm run-command invoke `
+      -g $rg -n $vmName `
+      --command-id RunShellScript `
+      --scripts $installScript
+  }
+} else {
+  $instanceIds = @(
+    az vmss list-instances -g $rg -n $vmss `
+      --query "[].instanceId" -o json |
+      ConvertFrom-Json
+  )
+  if ($instanceIds.Count -eq 0) {
+    throw "No VMSS instances found. Check `$rg and `$vmss."
+  }
+  foreach ($instanceId in $instanceIds) {
+    if ($instanceId -notmatch '^\d+$') {
+      throw "Unexpected Uniform VMSS instance ID: [$instanceId]"
+    }
+    az vmss run-command invoke `
+      -g $rg -n $vmss `
+      --instance-id $instanceId `
+      --command-id RunShellScript `
+      --scripts $installScript
+  }
 }
 ```
 

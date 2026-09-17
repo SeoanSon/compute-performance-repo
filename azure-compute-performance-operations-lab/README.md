@@ -4,6 +4,16 @@
 
 > 이 자료는 리소스 생성 튜토리얼이 아니라 **운영 가능한 Compute를 설계·관측·튜닝·복구하는 방법**에 초점을 둡니다.
 
+## 실행 문서
+
+처음부터 실습 환경을 만들고 결과를 분석하려면 다음 순서로 진행합니다.
+
+1. [`DEPLOYMENT.md`](./DEPLOYMENT.md): Azure CLI로 팀별 VMSS, 네트워크, Log Analytics, 샘플 API 배포
+2. [`TESTING-AND-ANALYSIS.md`](./TESTING-AND-ANALYSIS.md): 기준선·부하 테스트·장애 주입 실행, KQL 분석, 튜닝 판정
+3. [`FACILITATOR-GUIDE.md`](./FACILITATOR-GUIDE.md): 진행자 준비·힌트·완료 기준
+
+`scripts/install-order-api.sh`는 실습용 `/healthz`, `/readyz`, `/api/orders`, `/api/report` 서비스를 VMSS 인스턴스에 설치합니다. 실제 서비스가 있는 경우에도 동일한 health endpoint 계약을 유지하면 테스트 절차를 재사용할 수 있습니다.
+
 ## 1. 워크숍 개요
 
 ### 대상
@@ -395,4 +405,3 @@ T+00:50 후속 조치:
 - **비용 최적화**: Reservations, Savings Plan, Spot, 유휴 리소스
 - **보안 운영**: Managed Identity, JIT access, Defender for Servers, 디스크 암호화
 - **HPC/배치 운영**: 고성능 디스크, 병렬 처리, 작업 큐, capacity 계획
-

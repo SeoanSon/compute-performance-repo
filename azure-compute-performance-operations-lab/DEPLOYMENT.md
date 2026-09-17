@@ -202,19 +202,14 @@ if (-not $probeName) {
     --protocol Http --port 80 --path /healthz
 }
 
-$ruleName = az network lb rule list -g $rg --lb-name $lbName `
-  --query "[?frontendPort == '80' && backendPort == '80'].name | [0]" -o tsv
-if (-not $ruleName) {
-  az network lb rule create -g $rg --lb-name $lbName -n order-api-http `
-    --frontend-ip-name $frontendName `
-    --backend-pool-name $backendName `
-    --probe-name $probeName `
-    --protocol Tcp --frontend-port 80 --backend-port 80
-}
-else {
-  az network lb rule update -g $rg --lb-name $lbName -n $ruleName `
-    --probe-name $probeName
-}
+# `az vmss create` normally creates a rule named `LBRule`. Reuse it rather
+# than creating another rule with the same backend port and pool.
+$ruleName = "LBRule"
+az network lb rule show -g $rg --lb-name $lbName -n $ruleName `
+  --query "{name:name,frontendPort:frontendPort,backendPort:backendPort,probe:probe.id,backendPool:backendAddressPool.id}" `
+  -o json
+az network lb rule update -g $rg --lb-name $lbName -n $ruleName `
+  --probe-name $probeName
 
 az network lb probe list -g $rg --lb-name $lbName `
   --query "[].{name:name,protocol:protocol,port:port,path:requestPath}" -o table

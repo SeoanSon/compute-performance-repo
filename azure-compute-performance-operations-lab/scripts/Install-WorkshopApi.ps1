@@ -86,4 +86,3 @@ foreach ($vmId in $vmIds) {
 }
 
 Write-Host "All VMSS instances passed the workshop API installation check."
-

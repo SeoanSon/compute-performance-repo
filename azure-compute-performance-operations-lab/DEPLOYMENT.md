@@ -143,17 +143,19 @@ $orchestrationMode = az vmss show -g $rg -n $vmss `
   --query orchestrationMode -o tsv
 if ($orchestrationMode -eq "Flexible") {
   # Flexible VMSS instances have resource-name IDs, not numeric instance IDs.
-  $vmNames = @(
+  # Use full resource IDs so names containing underscores are not parsed as
+  # extra CLI arguments.
+  $vmIds = @(
     az vm list -g $rg `
-      --query "[?starts_with(name, '$vmss')].name" -o json |
+      --query "[?starts_with(name, '$vmss')].id" -o json |
       ConvertFrom-Json
   )
-  if ($vmNames.Count -eq 0) {
+  if ($vmIds.Count -eq 0) {
     throw "No Flexible VMSS VMs found. Check `$rg and `$vmss."
   }
-  foreach ($vmName in $vmNames) {
+  foreach ($vmId in $vmIds) {
     az vm run-command invoke `
-      -g $rg -n $vmName `
+      --ids $vmId `
       --command-id RunShellScript `
       --scripts $installScript
   }

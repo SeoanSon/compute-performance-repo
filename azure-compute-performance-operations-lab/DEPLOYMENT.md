@@ -195,7 +195,7 @@ $backendName = az network lb address-pool list -g $rg --lb-name $lbName `
   --query "[0].name" -o tsv
 
 $probeName = az network lb probe list -g $rg --lb-name $lbName `
-  --query "[?port == \`80\`].name | [0]" -o tsv
+  --query "[?port == '80'].name | [0]" -o tsv
 if (-not $probeName) {
   $probeName = "order-api-health"
   az network lb probe create -g $rg --lb-name $lbName -n $probeName `
@@ -203,7 +203,7 @@ if (-not $probeName) {
 }
 
 $ruleName = az network lb rule list -g $rg --lb-name $lbName `
-  --query "[?frontendPort == \`80\` && backendPort == \`80\`].name | [0]" -o tsv
+  --query "[?frontendPort == '80' && backendPort == '80'].name | [0]" -o tsv
 if (-not $ruleName) {
   az network lb rule create -g $rg --lb-name $lbName -n order-api-http `
     --frontend-ip-name $frontendName `
@@ -211,11 +211,15 @@ if (-not $ruleName) {
     --probe-name $probeName `
     --protocol Tcp --frontend-port 80 --backend-port 80
 }
+else {
+  az network lb rule update -g $rg --lb-name $lbName -n $ruleName `
+    --probe-name $probeName
+}
 
 az network lb probe list -g $rg --lb-name $lbName `
   --query "[].{name:name,protocol:protocol,port:port,path:requestPath}" -o table
 az network lb rule list -g $rg --lb-name $lbName `
-  --query "[].{name:name,frontendPort:frontendPort,backendPort:backendPort}" -o table
+  --query "[].{name:name,frontendPort:frontendPort,backendPort:backendPort,probe:probe.id}" -o table
 ```
 
 Load Balancer frontend IP를 확인합니다.

@@ -109,6 +109,7 @@ az vmss create `
   --resource-group $rg `
   --name $vmss `
   --location $location `
+  --orchestration-mode Uniform `
   --image Ubuntu2204 `
   --vm-sku Standard_D2s_v5 `
   --instance-count 2 `
@@ -128,57 +129,15 @@ az vmss create `
 
 ## 4. 샘플 HTTP 서비스 설치
 
-VMSS 인스턴스에 설치 스크립트를 실행합니다. 샘플 서비스는 외부 의존성 없이 health endpoint와 부하 테스트용 endpoint를 제공합니다.
+VMSS 인스턴스에 설치 스크립트를 실행합니다. 신규 배포는
+`--orchestration-mode Uniform`을 사용하므로 숫자형 instance ID를 사용합니다.
+기존 Flexible VMSS도 같은 helper가 자동으로 처리합니다.
 
 ```powershell
 $repoRoot = "C:\Users\seoanson\compute-performance-repo"
-$scriptPath = Join-Path $repoRoot `
-  "azure-compute-performance-operations-lab\scripts\install-order-api.sh"
-if (-not (Test-Path -LiteralPath $scriptPath)) {
-  throw "Install script not found: $scriptPath"
-}
-$installScript = Get-Content -Raw -LiteralPath $scriptPath
-
-$orchestrationMode = az vmss show -g $rg -n $vmss `
-  --query orchestrationMode -o tsv
-if ($orchestrationMode -eq "Flexible") {
-  # Flexible VMSS instances have resource-name IDs, not numeric instance IDs.
-  # Use full resource IDs so names containing underscores are not parsed as
-  # extra CLI arguments.
-  $vmIds = @(
-    az vm list -g $rg `
-      --query "[?starts_with(name, '$vmss')].id" -o json |
-      ConvertFrom-Json
-  )
-  if ($vmIds.Count -eq 0) {
-    throw "No Flexible VMSS VMs found. Check `$rg and `$vmss."
-  }
-  foreach ($vmId in $vmIds) {
-    az vm run-command invoke `
-      --ids $vmId `
-      --command-id RunShellScript `
-      --scripts $installScript
-  }
-} else {
-  $instanceIds = @(
-    az vmss list-instances -g $rg -n $vmss `
-      --query "[].instanceId" -o json |
-      ConvertFrom-Json
-  )
-  if ($instanceIds.Count -eq 0) {
-    throw "No VMSS instances found. Check `$rg and `$vmss."
-  }
-  foreach ($instanceId in $instanceIds) {
-    if ($instanceId -notmatch '^\d+$') {
-      throw "Unexpected Uniform VMSS instance ID: [$instanceId]"
-    }
-    az vmss run-command invoke `
-      -g $rg -n $vmss `
-      --instance-id $instanceId `
-      --command-id RunShellScript `
-      --scripts $installScript
-  }
-}
+$helper = Join-Path $repoRoot `
+  "azure-compute-performance-operations-lab\scripts\Install-WorkshopApi.ps1"
+& $helper -ResourceGroup $rg -VmssName $vmss
 ```
 
 > `install-order-api.sh`는 워크숍 환경에서 사용할 샘플 서비스 설치 스크립트입니다. 실제 서비스 배포 방식(Docker, systemd, 패키지 배포)이 있다면 이 단계에서 교체하고 health endpoint 계약만 유지합니다.
@@ -302,9 +261,16 @@ az vmss show -g $rg -n $vmss `
   --query "{name:name,sku:sku.name,capacity:sku.capacity,upgrade:upgradePolicy.mode}" `
   -o json | Tee-Object .\artifacts\deployment-verification.txt
 
-az vmss list-instances -g $rg -n $vmss `
-  --query "[].{id:instanceId,provisioning:provisioningState,health:latestModelApplied}" `
-  -o table | Tee-Object -Append .\artifacts\deployment-verification.txt
+$mode = az vmss show -g $rg -n $vmss --query orchestrationMode -o tsv
+if ($mode -eq "Flexible") {
+  az vm list -g $rg `
+    --query "[?starts_with(name, '$vmss')].{name:name,state:provisioningState}" `
+    -o table | Tee-Object -Append .\artifacts\deployment-verification.txt
+} else {
+  az vmss list-instances -g $rg -n $vmss `
+    --query "[].{id:instanceId,provisioning:provisioningState,health:latestModelApplied}" `
+    -o table | Tee-Object -Append .\artifacts\deployment-verification.txt
+}
 ```
 
 통과 조건:

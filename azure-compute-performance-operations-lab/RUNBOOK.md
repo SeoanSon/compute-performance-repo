@@ -49,6 +49,20 @@ az vmss show -g $rg -n $vmss `
   --query "{name:name,sku:sku.name,capacity:sku.capacity,mode:orchestrationMode}" -o table
 ```
 
+Install or repair the sample API with one command. Do not copy the older
+manual `run-command` blocks below.
+
+```powershell
+$apiInstaller = Join-Path $labRoot "scripts\Install-WorkshopApi.ps1"
+& $apiInstaller -ResourceGroup $rg -VmssName $vmss
+```
+
+The installer detects Uniform/Flexible VMSS, transfers the shell script as
+base64 to avoid PowerShell multiline argument splitting, stops nginx if it
+owns port 80, and verifies `order-api.service` plus `/healthz` before it
+returns success. If this command fails, stop and fix this step before testing
+the Load Balancer.
+
 두 명령이 정상적으로 리소스 그룹과 VMSS 정보를 출력해야 합니다.
 
 ## 2. 배포 상태 확인
@@ -127,120 +141,20 @@ if ($vmssMode -eq "Flexible") {
 
 ## 3. API와 Load Balancer 확인
 
-### 3-1. VM 내부 확인
+### 3-1. VM API 설치 및 내부 검증
 
-Flexible VMSS라면 다음을 그대로 실행합니다.
-
-```powershell
-$scriptPath = Join-Path $labRoot "scripts\install-order-api.sh"
-$installScript = Get-Content -Raw -LiteralPath $scriptPath
-if ($installScript -notmatch "order-api.service") {
-  throw "The local install script is not the expected workshop script: $scriptPath"
-}
-
-if ($vmssMode -eq "Flexible") {
-  foreach ($vmId in $vmIds) {
-    az vm run-command invoke --ids $vmId `
-      --command-id RunShellScript `
-      --scripts "systemctl is-active order-api; ss -lntp | grep ':80'; curl -fsS http://127.0.0.1/healthz"
-  }
-}
-```
-
-`order-api.service could not be found`가 나오거나 80번 포트 소유자가
-`nginx`이면 설치 결과가 VM에 적용되지 않은 것입니다. 아래 블록은 로컬
-파일 전달 여부와 무관하게 각 VM에 서비스를 직접 설치하고, 성공하지 않으면
-즉시 중단합니다.
+앞 단계에서 실행한 helper가 성공 메시지를 출력했으면, 아래 상태 확인만
+실행합니다. helper가 실패했다면 이 단계를 반복하지 말고 helper 오류부터
+해결합니다.
 
 ```powershell
-$repairScript = @'
-set -eux
-systemctl disable --now nginx 2>/dev/null || true
-pkill -x nginx 2>/dev/null || true
-apt-get update -y
-apt-get install -y python3
-cat >/opt/order-api.py <<'PY'
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-import hashlib
-class Handler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        if self.path in ("/healthz", "/readyz"):
-            body = b"ok\n"; self.send_response(200)
-        elif self.path.startswith("/api/orders"):
-            digest = hashlib.sha256((self.path * 200).encode()).hexdigest()
-            body = ('{"status":"ok","digest":"' + digest + '"}\n').encode()
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-        else:
-            body = b"not found\n"; self.send_response(404)
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
-    def log_message(self, format, *args):
-        pass
-ThreadingHTTPServer(("0.0.0.0", 80), Handler).serve_forever()
-PY
-cat >/etc/systemd/system/order-api.service <<'UNIT'
-[Unit]
-Description=Workshop Order API
-After=network-online.target
-[Service]
-ExecStart=/usr/bin/python3 /opt/order-api.py
-Restart=always
-RestartSec=2
-[Install]
-WantedBy=multi-user.target
-UNIT
-systemctl daemon-reload
-systemctl enable order-api
-systemctl restart order-api
-sleep 2
-systemctl is-active --quiet order-api
-curl -fsS http://127.0.0.1/healthz
-'@
-
-foreach ($vmId in $vmIds) {
-  Write-Host "Installing directly on $vmId"
-  az vm run-command invoke --ids $vmId `
-    --command-id RunShellScript `
-    --scripts $repairScript
-  if ($LASTEXITCODE -ne 0) {
-    throw "Installation failed on $vmId"
-  }
-}
+& (Join-Path $labRoot "scripts\Install-WorkshopApi.ps1") `
+  -ResourceGroup $rg `
+  -VmssName $vmss
 ```
 
-각 VM에서 다음이 보여야 합니다.
-
-```text
-active
-LISTEN ... :80
-ok
-```
-
-`inactive`이고 80번 포트의 프로세스가 `nginx`이면 이미지에 포함된 nginx가
-샘플 API의 포트를 점유한 상태입니다. 아래 재설치 블록은 nginx를 중지하고
-`order-api`를 다시 시작합니다.
-
-`active` 또는 `ok`가 없으면 다음 설치 블록을 한 번 실행한 뒤 3-1을 다시 실행합니다.
-
-```powershell
-if ($vmssMode -eq "Flexible") {
-  foreach ($vmId in $vmIds) {
-    $result = az vm run-command invoke --ids $vmId `
-      --command-id RunShellScript `
-      --scripts $installScript | ConvertFrom-Json
-    $result.value[0].message
-  }
-} else {
-  $instanceIds = @(az vmss list-instances -g $rg -n $vmss --query "[].instanceId" -o json | ConvertFrom-Json)
-  foreach ($instanceId in $instanceIds) {
-    $result = az vmss run-command invoke -g $rg -n $vmss --instance-id $instanceId `
-      --command-id RunShellScript --scripts $installScript | ConvertFrom-Json
-    $result.value[0].message
-  }
-}
-```
+helper는 각 VM에서 `order-api.service`, Python listener, `/healthz`를 검증합니다.
+성공 메시지가 없으면 다음 단계로 진행하지 않습니다.
 
 ### 3-2. Load Balancer rule과 probe 확인
 

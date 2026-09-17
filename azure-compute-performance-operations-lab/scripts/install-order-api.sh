@@ -69,3 +69,5 @@ systemctl enable order-api
 systemctl restart order-api
 test -f /etc/systemd/system/order-api.service
 systemctl is-active --quiet order-api
+curl -fsS http://127.0.0.1/healthz >/dev/null
+echo "Workshop API installation succeeded"

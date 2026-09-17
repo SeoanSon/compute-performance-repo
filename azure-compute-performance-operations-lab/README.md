@@ -20,6 +20,14 @@
 
 `scripts/install-order-api.sh`는 실습용 `/healthz`, `/readyz`, `/api/orders`, `/api/report` 서비스를 VMSS 인스턴스에 설치합니다. 실제 서비스가 있는 경우에도 동일한 health endpoint 계약을 유지하면 테스트 절차를 재사용할 수 있습니다.
 
+신규 환경은 배포 시 `Uniform` orchestration을 명시해 워크숍의 기본 경로를
+고정합니다. 기존 Flexible 환경도 helper가 지원합니다.
+
+배포 후 샘플 API 설치는 수동 `az vm run-command` 조합이 아니라
+[`scripts/Install-WorkshopApi.ps1`](./scripts/Install-WorkshopApi.ps1)를
+사용합니다. 이 helper는 Uniform/Flexible VMSS를 자동 판별하고 각 인스턴스에
+설치 후 `/healthz`까지 검증합니다.
+
 ## 1. 워크숍 개요
 
 ### 대상

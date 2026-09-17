@@ -255,12 +255,20 @@ HTTP rule, HTTP probe, backend pool, 그리고 TCP 80 허용 NSG 규칙이 모�
 
 ## 7. Azure Monitor 연결
 
-VMSS에 system-assigned managed identity를 켭니다.
+VMSS에 system-assigned managed identity를 켭니다. 일부 Azure CLI 버전에서는
+`az vmss identity assign`이 UserAssigned ID만 지원하므로 `update --set`을 사용합니다.
 
 ```powershell
-az vmss identity assign -g $rg -n $vmss
+az vmss update -g $rg -n $vmss `
+  --set identity.type=SystemAssigned
+
+az vmss show -g $rg -n $vmss `
+  --query "{identityType:identity.type,principalId:identity.principalId,tenantId:identity.tenantId}" `
+  -o json
 $vmssId = az vmss show -g $rg -n $vmss --query id -o tsv
 ```
+
+출력의 `identityType`이 `SystemAssigned`이고 `principalId`가 비어 있지 않아야 합니다. 이 단계가 실패하면 Azure CLI를 최신 버전으로 업데이트한 뒤 다시 실행합니다.
 
 Azure Portal에서 다음을 연결합니다.
 

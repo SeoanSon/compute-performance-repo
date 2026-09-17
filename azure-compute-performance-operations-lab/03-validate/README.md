@@ -4,6 +4,22 @@
 
 VM 내부 서비스, Load Balancer probe/rule, Public IP, 외부 HTTP 경로를 순서대로 검증합니다.
 
+## 이 단계에서 배우는 것
+
+- 장애를 **애플리케이션 내부 → VM 포트 → NSG → backend pool → Load Balancer → Public IP** 순서로 좁히는 방법
+- `Running`, `Listening`, `Healthy`, `HTTP 200`이 서로 다른 상태라는 점
+- 외부 접속 실패를 바로 부하 테스트나 SKU 문제로 해석하지 않는 방법
+
+## 관찰 포인트
+
+| 확인 위치 | 확인할 것 | 실패 시 의미 |
+|---|---|---|
+| VM service | `order-api` active | 서비스가 실행되지 않음 |
+| VM port | TCP 80 listener | 포트 충돌 또는 프로세스 문제 |
+| Probe | `/healthz` 200 | LB가 backend를 제외할 수 있음 |
+| Rule | frontend 80 → backend 80 | 외부 경로가 없음 |
+| Public IP | frontend 연결 여부 | 올바른 진입점이 아님 |
+
 ## 실행
 
 먼저 현재 세션을 복구합니다.
@@ -50,4 +66,3 @@ curl.exe -fsS "http://$pip/api/orders"
 ## 다음 단계
 
 [`../04-baseline/README.md`](../04-baseline/README.md)
-

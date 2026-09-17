@@ -10,7 +10,8 @@
 
 1. [`DEPLOYMENT.md`](./DEPLOYMENT.md): Azure CLI로 팀별 VMSS, 네트워크, Log Analytics, 샘플 API 배포
 2. [`TESTING-AND-ANALYSIS.md`](./TESTING-AND-ANALYSIS.md): 기준선·부하 테스트·장애 주입 실행, KQL 분석, 튜닝 판정
-3. [`FACILITATOR-GUIDE.md`](./FACILITATOR-GUIDE.md): 진행자 준비·힌트·완료 기준
+3. [`ASSESSMENT.md`](./ASSESSMENT.md): 사전·사후 평가, 실기 시나리오, 전후 차이 판정
+4. [`FACILITATOR-GUIDE.md`](./FACILITATOR-GUIDE.md): 진행자 준비·힌트·완료 기준
 
 `scripts/install-order-api.sh`는 실습용 `/healthz`, `/readyz`, `/api/orders`, `/api/report` 서비스를 VMSS 인스턴스에 설치합니다. 실제 서비스가 있는 경우에도 동일한 health endpoint 계약을 유지하면 테스트 절차를 재사용할 수 있습니다.
 
@@ -56,7 +57,7 @@
 
 | 시간 | 세션 | 결과물 |
 |---:|---|---|
-| 00:00–00:30 | 오리엔테이션 및 운영 시나리오 | 팀별 목표 SLO |
+| 00:00–00:45 | 사전 평가·오리엔테이션 및 운영 시나리오 | 개인 사전 점수·팀별 목표 SLO |
 | 00:30–01:20 | 기준선 측정 | Baseline Sheet |
 | 01:20–02:20 | 부하 테스트와 병목 분석 | Bottleneck Diagnosis |
 | 02:20–02:35 | 휴식 |  |
@@ -65,7 +66,7 @@
 | 04:20–04:35 | 휴식 |  |
 | 04:35–05:35 | 장애 주입 GameDay | Incident Timeline |
 | 05:35–06:10 | 비용·운영성 평가 | Improvement Backlog |
-| 06:10–06:30 | 팀별 발표 및 회고 | 최종 운영 리포트 |
+| 06:10–06:30 | 사후 평가·팀별 발표 및 회고 | 개인 사후 점수·최종 운영 리포트 |
 
 ## 3. 실습 시나리오
 

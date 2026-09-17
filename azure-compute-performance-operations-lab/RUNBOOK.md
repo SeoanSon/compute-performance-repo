@@ -127,6 +127,9 @@ Flexible VMSS라면 다음을 그대로 실행합니다.
 ```powershell
 $scriptPath = Join-Path $labRoot "scripts\install-order-api.sh"
 $installScript = Get-Content -Raw -LiteralPath $scriptPath
+if ($installScript -notmatch "order-api.service") {
+  throw "The local install script is not the expected workshop script: $scriptPath"
+}
 
 if ($vmssMode -eq "Flexible") {
   foreach ($vmId in $vmIds) {
@@ -154,15 +157,17 @@ ok
 ```powershell
 if ($vmssMode -eq "Flexible") {
   foreach ($vmId in $vmIds) {
-    az vm run-command invoke --ids $vmId `
+    $result = az vm run-command invoke --ids $vmId `
       --command-id RunShellScript `
-      --scripts $installScript
+      --scripts $installScript | ConvertFrom-Json
+    $result.value[0].message
   }
 } else {
   $instanceIds = @(az vmss list-instances -g $rg -n $vmss --query "[].instanceId" -o json | ConvertFrom-Json)
   foreach ($instanceId in $instanceIds) {
-    az vmss run-command invoke -g $rg -n $vmss --instance-id $instanceId `
-      --command-id RunShellScript --scripts $installScript
+    $result = az vmss run-command invoke -g $rg -n $vmss --instance-id $instanceId `
+      --command-id RunShellScript --scripts $installScript | ConvertFrom-Json
+    $result.value[0].message
   }
 }
 ```

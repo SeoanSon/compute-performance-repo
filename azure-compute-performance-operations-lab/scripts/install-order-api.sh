@@ -64,4 +64,8 @@ systemctl daemon-reload
 if systemctl list-unit-files nginx.service >/dev/null 2>&1; then
   systemctl disable --now nginx || true
 fi
-systemctl enable --now order-api
+pkill -x nginx 2>/dev/null || true
+systemctl enable order-api
+systemctl restart order-api
+test -f /etc/systemd/system/order-api.service
+systemctl is-active --quiet order-api

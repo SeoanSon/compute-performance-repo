@@ -77,8 +77,7 @@ az network vnet create -g $rg -n $vnet -l $location `
 az monitor log-analytics workspace create `
   --resource-group $rg `
   --workspace-name $workspace `
-  --location $location `
-  --retention-time 7
+  --location $location
 
 $workspaceId = az monitor log-analytics workspace show -g $rg -n $workspace `
   --query id -o tsv

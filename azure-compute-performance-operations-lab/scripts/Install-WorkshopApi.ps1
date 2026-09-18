@@ -17,6 +17,10 @@ if (-not (Test-Path -LiteralPath $ScriptPath)) {
 }
 
 $installScript = Get-Content -Raw -LiteralPath $ScriptPath
+# Azure Linux Run Command executes the payload with Bash. Normalize the
+# repository's Windows line endings before transferring the shell script.
+$installScript = $installScript -replace "`r`n", "`n"
+$installScript = $installScript -replace "`r", "`n"
 if ($installScript -notmatch "order-api.service") {
     throw "The install script does not contain the expected order-api service."
 }

@@ -1,8 +1,40 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-apt-get update -y
-apt-get install -y python3
+wait_for_dpkg_lock() {
+    local waited=0
+    local timeout=900
+
+    while command -v fuser >/dev/null 2>&1 &&
+        fuser /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock >/dev/null 2>&1; do
+        if [ "$waited" -ge "$timeout" ]; then
+            echo "Timed out waiting for another apt/dpkg process to finish." >&2
+            fuser /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock >&2 || true
+            return 1
+        fi
+        sleep 5
+        waited=$((waited + 5))
+    done
+}
+
+apt_retry() {
+    local attempt=1
+    local max_attempts=6
+
+    while ! "$@"; do
+        if [ "$attempt" -ge "$max_attempts" ]; then
+            return 1
+        fi
+        wait_for_dpkg_lock
+        sleep 5
+        attempt=$((attempt + 1))
+    done
+}
+
+wait_for_dpkg_lock
+apt_retry apt-get update -y
+wait_for_dpkg_lock
+apt_retry apt-get install -y python3
 
 cat >/opt/order-api.py <<'PY'
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer

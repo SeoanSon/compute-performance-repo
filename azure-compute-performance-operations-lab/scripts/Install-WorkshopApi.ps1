@@ -66,14 +66,15 @@ $payload = [Convert]::ToBase64String(
 $remoteCommand = "echo '$payload' | base64 -d > /tmp/install-order-api.sh && chmod 700 /tmp/install-order-api.sh && bash /tmp/install-order-api.sh"
 
 foreach ($vmId in $vmIds) {
-    Write-Host "Installing workshop API on [$vmId]"
     if ($vmId.StartsWith("vmss:")) {
         $instanceId = $vmId.Substring(5)
+        Write-Host "Installing workshop API on VMSS instance [$instanceId]"
         $raw = az vmss run-command invoke -g $ResourceGroup -n $VmssName `
             --instance-id $instanceId `
             --command-id RunShellScript `
             --scripts $remoteCommand
     } else {
+        Write-Host "Installing workshop API on VM [$vmId]"
         $raw = az vm run-command invoke --ids $vmId `
             --command-id RunShellScript `
             --scripts $remoteCommand

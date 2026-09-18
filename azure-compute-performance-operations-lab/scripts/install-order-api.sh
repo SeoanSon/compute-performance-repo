@@ -100,6 +100,18 @@ pkill -x nginx 2>/dev/null || true
 systemctl enable order-api
 systemctl restart order-api
 test -f /etc/systemd/system/order-api.service
-systemctl is-active --quiet order-api
-curl -fsS http://127.0.0.1/healthz >/dev/null
-echo "Workshop API installation succeeded"
+
+for attempt in $(seq 1 30); do
+    if systemctl is-active --quiet order-api &&
+        curl -fsS --max-time 2 http://127.0.0.1/healthz >/dev/null; then
+        echo "Workshop API installation succeeded"
+        exit 0
+    fi
+    sleep 2
+done
+
+echo "Workshop API failed to become healthy." >&2
+systemctl status order-api --no-pager >&2 || true
+journalctl -u order-api -n 50 --no-pager >&2 || true
+ss -lntp >&2 || true
+exit 1

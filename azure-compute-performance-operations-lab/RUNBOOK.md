@@ -71,21 +71,14 @@ the Load Balancer.
 
 ```powershell
 $lbName = az network lb list -g $rg --query "[0].name" -o tsv
-$frontendConfigs = @(
-  az network lb frontend-ip list -g $rg --lb-name $lbName -o json |
-    ConvertFrom-Json
-)
-$publicIpId = $null
-foreach ($frontendConfig in $frontendConfigs) {
-  if ($null -ne $frontendConfig.publicIPAddress -and $frontendConfig.publicIPAddress.id) {
-    $publicIpId = $frontendConfig.publicIPAddress.id
-    break
-  }
+$frontendName = az network lb show -g $rg -n $lbName `
+  --query "frontendIPConfigurations[0].name" -o tsv
+$publicIpId = az network lb show -g $rg -n $lbName `
+  --query "frontendIPConfigurations[?publicIPAddress].publicIPAddress.id | [0]" -o tsv
+if (-not $publicIpId) {
+  throw "No public IP is attached to the Load Balancer frontend."
 }
-$pip = $null
-if ($publicIpId) {
-  $pip = az network public-ip show --ids $publicIpId --query ipAddress -o tsv
-}
+$pip = az network public-ip show --ids $publicIpId --query ipAddress -o tsv
 
 $vmssMode = az vmss show -g $rg -n $vmss --query orchestrationMode -o tsv
 $vmssMode
@@ -95,8 +88,7 @@ $pip
 
 if (-not $lbName) { throw "Load Balancer was not found." }
 if (-not $pip) {
-  Write-Host "No public IP is attached. Frontend configuration:"
-  $frontendConfigs | Select-Object name, privateIPAddress, publicIPAddress | Format-List
+  Write-Host "No public IP is attached to frontend [$frontendName]."
   throw "No public IP is attached to the Load Balancer frontend. Run the remediation block below."
 }
 ```
@@ -109,7 +101,6 @@ if (-not $pip) {
 If the previous block says that no public IP is attached, run this remediation block and then repeat step 2.
 
 ```powershell
-$frontendName = $frontendConfigs[0].name
 $pipName = "pip-$vmss"
 
 az network public-ip create -g $rg -n $pipName `

@@ -31,8 +31,11 @@ $vmss = "vmss-order-$team"
 $repoRoot = "C:\Users\seoanson\compute-performance-repo"
 $labRoot = Join-Path $repoRoot "azure-compute-performance-operations-lab"
 $lbName = az network lb list -g $rg --query "[0].name" -o tsv
-$frontend = az network lb frontend-ip list -g $rg --lb-name $lbName -o json | ConvertFrom-Json
-$publicIpId = $frontend[0].publicIPAddress.id
+$publicIpId = az network lb show -g $rg -n $lbName `
+  --query "frontendIPConfigurations[?publicIPAddress].publicIPAddress.id | [0]" -o tsv
+if (-not $publicIpId) {
+  throw "No public IP is attached to the Load Balancer frontend."
+}
 $pip = az network public-ip show --ids $publicIpId --query ipAddress -o tsv
 ```
 

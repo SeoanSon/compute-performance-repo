@@ -195,12 +195,41 @@ curl.exe "http://$pip/readyz"
 ## 6. 연결 문제 진단
 
 외부 curl이 실패하면 먼저 VM 내부에서 서비스가 실제로 실행 중인지 확인합니다.
+이 진단에서는 이전 세션의 `$vmIds`를 재사용하지 않습니다. VMSS 모드에
+따라 현재 인스턴스를 다시 조회해야 오래된 VM Resource ID 오류를 피할 수
+있습니다.
 
 ```powershell
-foreach ($vmId in $vmIds) {
-  az vm run-command invoke --ids $vmId `
-    --command-id RunShellScript `
-    --scripts "systemctl is-active order-api; ss -lntp | grep ':80'; curl -fsS http://127.0.0.1/healthz"
+az vmss show -g $rg -n $vmss --query orchestrationMode -o tsv
+$vmssMode = az vmss show -g $rg -n $vmss --query orchestrationMode -o tsv
+
+if ($vmssMode -eq "Flexible") {
+  $currentVmIds = @(
+    (az vm list -g $rg `
+      --query "[?starts_with(name, '$vmss')].id" -o tsv) `
+      -split "\r?\n" |
+      ForEach-Object { $_.Trim() } |
+      Where-Object { $_ }
+  )
+  foreach ($currentVmId in $currentVmIds) {
+    az vm run-command invoke --ids $currentVmId `
+      --command-id RunShellScript `
+      --scripts "systemctl is-active order-api; ss -lntp | grep ':80'; curl -fsS http://127.0.0.1/healthz"
+  }
+} else {
+  $currentInstanceIds = @(
+    (az vmss list-instances -g $rg -n $vmss `
+      --query "[].instanceId" -o tsv) `
+      -split "\r?\n" |
+      ForEach-Object { $_.Trim() } |
+      Where-Object { $_ }
+  )
+  foreach ($currentInstanceId in $currentInstanceIds) {
+    az vmss run-command invoke -g $rg -n $vmss `
+      --instance-id $currentInstanceId `
+      --command-id RunShellScript `
+      --scripts "systemctl is-active order-api; ss -lntp | grep ':80'; curl -fsS http://127.0.0.1/healthz"
+  }
 }
 ```
 

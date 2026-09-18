@@ -53,6 +53,8 @@ Install or repair the sample API with one command. Do not copy the older
 manual `run-command` blocks below.
 
 ```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
+
 $apiInstaller = Join-Path $labRoot "scripts\Install-WorkshopApi.ps1"
 & $apiInstaller -ResourceGroup $rg -VmssName $vmss
 ```
@@ -148,6 +150,8 @@ if ($vmssMode -eq "Flexible") {
 해결합니다.
 
 ```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
+
 & (Join-Path $labRoot "scripts\Install-WorkshopApi.ps1") `
   -ResourceGroup $rg `
   -VmssName $vmss
@@ -211,6 +215,8 @@ VMSS의 모든 인스턴스가 최근 15분 안에 보이면 통과입니다. �
 추가 도구 설치 없이 저장소의 PowerShell 스크립트를 실행합니다.
 
 ```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
+
 $runId = Get-Date -Format "yyyyMMdd-HHmmss"
 $target = "http://$pip/api/orders"
 $result = Join-Path $artifacts "load-tests\baseline-$runId.csv"

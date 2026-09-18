@@ -137,6 +137,7 @@ VMSS 인스턴스에 설치 스크립트를 실행합니다. 신규 배포는
 $repoRoot = "C:\Users\seoanson\compute-performance-repo"
 $helper = Join-Path $repoRoot `
   "azure-compute-performance-operations-lab\scripts\Install-WorkshopApi.ps1"
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
 & $helper -ResourceGroup $rg -VmssName $vmss
 ```
 

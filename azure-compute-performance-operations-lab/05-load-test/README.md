@@ -29,6 +29,8 @@ Warm-up → Steady load → Resource stress → Cool-down
 ## HTTP 부하
 
 ```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
+
 $runId = Get-Date -Format "yyyyMMdd-HHmmss"
 $result = Join-Path $artifacts "load-tests\steady-$runId.csv"
 & (Join-Path $labRoot "scripts\http-baseline.ps1") `

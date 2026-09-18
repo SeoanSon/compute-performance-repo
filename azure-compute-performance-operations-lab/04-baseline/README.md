@@ -29,6 +29,8 @@
 ## 실행
 
 ```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
+
 $runId = Get-Date -Format "yyyyMMdd-HHmmss"
 $artifacts = Join-Path $labRoot "artifacts"
 $target = "http://$pip/api/orders"

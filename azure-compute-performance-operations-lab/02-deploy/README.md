@@ -51,6 +51,8 @@ az vmss create `
 배포 후 샘플 API는 수동 `run-command`가 아니라 helper로 설치합니다.
 
 ```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
+
 & (Join-Path $labRoot "scripts\Install-WorkshopApi.ps1") `
   -ResourceGroup $rg `
   -VmssName $vmss

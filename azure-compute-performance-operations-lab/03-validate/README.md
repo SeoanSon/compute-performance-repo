@@ -39,6 +39,8 @@ $pip = az network public-ip show --ids $publicIpId --query ipAddress -o tsv
 샘플 API를 설치·검증합니다.
 
 ```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
+
 & (Join-Path $labRoot "scripts\Install-WorkshopApi.ps1") `
   -ResourceGroup $rg `
   -VmssName $vmss
